@@ -38,7 +38,7 @@ IMG_READY           = "img_ready.png"
 IMG_OK_BLUE         = "img_ok_orange.png"   # same file - only orange needed
 IMG_OK_ORANGE       = "img_ok_orange.png"
 
-MATCH_CONFIDENCE    = 0.65
+MATCH_CONFIDENCE    = 0.55
 
 SKILL_KEY           = "6"
 
@@ -242,7 +242,11 @@ def step_walk_to_npc(hwnd):
     MAX_WALK = 4.0
     CHECK_INTERVAL = 0.3
 
-    win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_W, 0)
+    # Focus game window before sending keys
+    focus_game_window(hwnd)
+    time.sleep(0.2)
+
+    pyautogui.keyDown("w")
     start = time.time()
     found = False
 
@@ -251,27 +255,27 @@ def step_walk_to_npc(hwnd):
         ss, (wl, wt) = capture_window(hwnd)
         pos = find_template(ss, IMG_COLLAB_TITLE)
         if pos:
-            win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_W, 0)
-            # Tap S briefly to cancel momentum/stop character sliding
-            VK_S = win32api.VkKeyScan("s") & 0xFF
-            win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_S, 0)
-            time.sleep(0.15)
-            win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_S, 0)
-            time.sleep(0.2)
-            # Re-check tooltip is still visible after stopping
+            # Stop W immediately
+            pyautogui.keyUp("w")
+            # Tap S to kill momentum (pyautogui works since game is focused)
+            pyautogui.keyDown("s")
+            time.sleep(0.20)
+            pyautogui.keyUp("s")
+            time.sleep(0.25)
+            # Re-check position after stopping
             ss2, (wl2, wt2) = capture_window(hwnd)
             pos2 = find_template(ss2, IMG_COLLAB_TITLE)
             if pos2:
                 sx, sy = wl2 + pos2[0], wt2 + pos2[1]
             else:
-                sx, sy = wl + pos[0], wt + pos[1]  # fallback to original pos
+                sx, sy = wl + pos[0], wt + pos[1]
             log(f"  Tooltip found after {time.time()-start:.1f}s -> clicking ({sx},{sy})")
             real_click(sx, sy)
             found = True
             break
 
     if not found:
-        win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_W, 0)
+        pyautogui.keyUp("w")   # always release W even if not found
         log("  [WARN] Tooltip not found within 4s of walking.")
 
     human_delay(DELAY_MEDIUM)
