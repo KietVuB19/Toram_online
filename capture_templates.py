@@ -1,113 +1,127 @@
 """
-Template Capture Helper
-========================
-Run this script to easily screenshot UI elements from Toram Online
-and save them as the template images needed by the bot.
+Simple Template Capture Tool
+==============================
+Instead of dragging on an overlay (which can be tricky),
+this tool lets you:
+  1. Position your game window showing the element
+  2. Press ENTER in terminal
+  3. A 3-second countdown gives you time to click on the game
+  4. Then use your mouse to SELECT a region using the snipping tool approach
 
-Usage:
-    python capture_templates.py
+Actually even simpler: press F10 while the element is on screen,
+and it saves a FULL screenshot. Then you crop it manually in Paint.
+
+OR: use the auto-crop method - you hover your mouse over the element,
+press F10, and it saves a small region around your cursor.
 """
 
 import time
 import os
 import sys
+
 try:
     from PIL import Image, ImageGrab
-    import win32gui
     import win32api
     import win32con
+    import win32gui
 except ImportError:
     print("Run: pip install pillow pywin32")
     sys.exit(1)
 
-GAME_TITLE = "Toram Online"
-
 TEMPLATES = [
-    ("img_collab_title.png", "Collab Battle Lv140  – the clickable menu entry"),
-    ("img_ready.png",        "I'm ready!! button  – blue, idle state"),
-    ("img_ok_blue.png",      "OK button            – blue, victory screen"),
-    ("img_ok_orange.png",    "OK button            – orange hover state (optional)"),
-    ("img_sword.png",        "Sword/skill icon     – bottom bar (optional)"),
+    ("img_collab_title.png", "Collab Battle Lv140 tooltip",
+     "Walk near the crystal NPC until dark brown tooltip appears, hover mouse OVER it"),
+    ("img_ready.png",        "I'm ready!! button  (ORANGE - hover state)",
+     "In battle lobby: move mouse OVER the button so it turns ORANGE, then stay still"),
+    ("img_ok_orange.png",    "OK button  (ORANGE - hover state)",
+     "On victory screen: move mouse OVER the OK button so it turns ORANGE, then stay still"),
 ]
 
-def find_window():
-    result = []
-    def cb(hwnd, _):
-        if GAME_TITLE.lower() in win32gui.GetWindowText(hwnd).lower():
-            result.append(hwnd)
-    win32gui.EnumWindows(cb, None)
-    return result[0] if result else None
 
 
-def capture_region():
-    """Let the user draw a rectangle with the mouse."""
-    import tkinter as tk
-    coords = {}
+def countdown(n=3):
+    for i in range(n, 0, -1):
+        print(f"  Capturing in {i}...", end="\r")
+        time.sleep(1)
+    print("  Capturing NOW!     ")
 
-    root = tk.Tk()
-    root.attributes("-fullscreen", True)
-    root.attributes("-alpha", 0.3)
-    root.configure(bg="black")
-    root.attributes("-topmost", True)
 
-    canvas = tk.Canvas(root, cursor="cross", bg="black")
-    canvas.pack(fill=tk.BOTH, expand=True)
+def capture_around_cursor(radius=60):
+    """Capture a small region around the current mouse cursor."""
+    x, y = win32api.GetCursorPos()
+    bbox = (x - radius, y - radius, x + radius, y + radius)
+    # Make sure bbox is within screen bounds
+    sw = win32api.GetSystemMetrics(0)
+    sh = win32api.GetSystemMetrics(1)
+    bbox = (
+        max(0, bbox[0]),
+        max(0, bbox[1]),
+        min(sw, bbox[2]),
+        min(sh, bbox[3]),
+    )
+    return ImageGrab.grab(bbox=bbox), (x, y)
 
-    start = {}
 
-    def on_press(e):
-        start["x"], start["y"] = e.x_root, e.y_root
-
-    def on_release(e):
-        coords["bbox"] = (
-            min(start["x"], e.x_root),
-            min(start["y"], e.y_root),
-            max(start["x"], e.x_root),
-            max(start["y"], e.y_root),
-        )
-        root.destroy()
-
-    canvas.bind("<ButtonPress-1>", on_press)
-    canvas.bind("<ButtonRelease-1>", on_release)
-    root.mainloop()
-    return coords.get("bbox")
+def capture_fullscreen():
+    """Capture the entire screen."""
+    return ImageGrab.grab()
 
 
 def main():
-    print("=" * 50)
-    print("  Toram Bot – Template Image Capture Tool")
-    print("=" * 50)
+    print("=" * 55)
+    print("  Toram Bot – Simple Template Capture Tool")
+    print("=" * 55)
     print()
-    print("Instructions:")
-    print("  1. Open Toram Online and navigate to the relevant screen.")
-    print("  2. When prompted, a transparent overlay will appear.")
-    print("  3. Click-and-drag around the UI element to capture it.")
+    print("HOW IT WORKS:")
+    print("  • For each template, you get a 5-second countdown")
+    print("  • During countdown: switch to game, HOVER your mouse")
+    print("    directly OVER the button/element you want to capture")
+    print("  • It saves a 120x120 pixel region around your cursor")
+    print("  • Simple and reliable!")
+    print()
+    print("TIP: Make sure the game is visible (not minimized)")
     print()
 
-    for filename, description in TEMPLATES:
+    os.makedirs("templates_preview", exist_ok=True)
+
+    for filename, label, instruction in TEMPLATES:
+        print(f"{'─'*55}")
+        print(f"  Next: {label}")
+        print(f"  → {instruction}")
+        print()
+
         if os.path.exists(filename):
-            ans = input(f"'{filename}' already exists. Recapture? (y/N): ").strip().lower()
+            ans = input(f"  '{filename}' already exists. Recapture? (y/N): ").strip().lower()
             if ans != "y":
-                print(f"  Skipping {filename}\n")
+                print(f"  Skipping.\n")
                 continue
 
-        print(f"── Capture: {description}")
-        print(f"   File: {filename}")
-        input("   Press ENTER when the element is visible on screen…")
+        input(f"  Press ENTER to start 5-second countdown…")
+        print(f"  → Switch to game and hover mouse over: {label}")
 
-        time.sleep(0.5)
-        bbox = capture_region()
-        if not bbox or bbox[2] - bbox[0] < 5 or bbox[3] - bbox[1] < 5:
-            print("   Selection too small or cancelled. Skipping.\n")
-            continue
+        for i in range(5, 0, -1):
+            print(f"  Capturing in {i}...  (hover mouse over the element!)", end="\r")
+            time.sleep(1)
+        print()
 
-        img = ImageGrab.grab(bbox=bbox)
+        img, cursor_pos = capture_around_cursor(radius=80)
         img.save(filename)
-        print(f"   ✓ Saved {filename} ({img.width}×{img.height} px)\n")
 
-    print("=" * 50)
-    print("All done! You can now run toram_collab_bot.py")
-    print("=" * 50)
+        # Also save a preview with larger context
+        preview, _ = capture_around_cursor(radius=150)
+        preview.save(f"templates_preview/preview_{filename}")
+
+        print(f"  ✓ Saved {filename}  ({img.width}×{img.height}px)  cursor was at {cursor_pos}")
+        print(f"  ✓ Preview saved to templates_preview/preview_{filename}")
+        print()
+
+    print("=" * 55)
+    print("  All templates captured!")
+    print("  Check the 'templates_preview' folder to verify")
+    print("  they look correct before running the bot.")
+    print()
+    print("  Next step:  py toram_collab_bot.py")
+    print("=" * 55)
 
 
 if __name__ == "__main__":
