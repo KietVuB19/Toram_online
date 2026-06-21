@@ -1,5 +1,5 @@
 """
-Toram Online - Collab Battle Lv90 Auto Bot (v4)
+Toram Online - Collab Battle Lv140 Auto Bot (v4)
 =================================================
 - Auto-detects the game window by scanning all open windows
 - Clicks the CENTER of the game window to focus it (not Chrome)
@@ -155,7 +155,7 @@ def sendinput_key_press(key, hold_sec=0):
 # Keywords to auto-detect the game window (case-insensitive, any match works)
 GAME_WINDOW_KEYWORDS = ["toram", "ToramOnline"]
 
-IMG_COLLAB_TITLE    = "img_collab_title.png"   # Collab Battle Lv90
+IMG_COLLAB_TITLE    = "img_collab_title.png"   # Collab Battle Lv140
 IMG_READY           = "img_ready.png"
 IMG_OK_BLUE         = "img_ok_orange.png"   # same file - only orange needed
 IMG_OK_ORANGE       = "img_ok_orange.png"
@@ -663,7 +663,7 @@ def listen_for_hotkey():
 
 if __name__ == "__main__":
     print("=" * 55)
-    print("  Toram Online – Collab Battle Lv90 Bot  (v4)")
+    print("  Toram Online – Collab Battle Lv140 Bot  (v4)")
     print("=" * 55)
     print(f"  Keywords : {GAME_WINDOW_KEYWORDS}")
     print(f"  Skill    : key '{SKILL_KEY}'")
