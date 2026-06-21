@@ -29,12 +29,14 @@ except ImportError:
     sys.exit(1)
 
 TEMPLATES = [
-    ("img_collab_title.png", "Collab Battle Lv140 tooltip",
+    ("img_collab_title.png", "Collab Battle Lv140 tooltip", 60,
      "Walk near the crystal NPC until dark brown tooltip appears, hover mouse OVER it"),
-    ("img_ready.png",        "I'm ready!! button  (ORANGE - hover state)",
+    ("img_ready.png",        "I'm ready!! button  (ORANGE - hover state)", 60,
      "In battle lobby: move mouse OVER the button so it turns ORANGE, then stay still"),
-    ("img_ok_orange.png",    "OK button  (ORANGE - hover state)",
+    ("img_ok_orange.png",    "OK button  (ORANGE - hover state)", 60,
      "On victory screen: move mouse OVER the OK button so it turns ORANGE, then stay still"),
+    ("img_skill_icon.png",   "Skill icon in slot 6 (SMALL - tight crop)", 18,
+     "During battle: hover mouse directly over the CENTER of the icon in slot 6 only"),
 ]
 
 
@@ -46,7 +48,7 @@ def countdown(n=3):
     print("  Capturing NOW!     ")
 
 
-def capture_around_cursor(radius=60):
+def capture_around_cursor(radius=25):
     """Capture a small region around the current mouse cursor."""
     x, y = win32api.GetCursorPos()
     bbox = (x - radius, y - radius, x + radius, y + radius)
@@ -84,7 +86,7 @@ def main():
 
     os.makedirs("templates_preview", exist_ok=True)
 
-    for filename, label, instruction in TEMPLATES:
+    for filename, label, radius, instruction in TEMPLATES:
         print(f"{'─'*55}")
         print(f"  Next: {label}")
         print(f"  → {instruction}")
@@ -104,11 +106,11 @@ def main():
             time.sleep(1)
         print()
 
-        img, cursor_pos = capture_around_cursor(radius=80)
+        img, cursor_pos = capture_around_cursor(radius=radius)
         img.save(filename)
 
         # Also save a preview with larger context
-        preview, _ = capture_around_cursor(radius=150)
+        preview, _ = capture_around_cursor(radius=radius + 60)
         preview.save(f"templates_preview/preview_{filename}")
 
         print(f"  ✓ Saved {filename}  ({img.width}×{img.height}px)  cursor was at {cursor_pos}")
