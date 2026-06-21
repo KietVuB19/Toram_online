@@ -21,10 +21,132 @@ try:
     import win32gui
     import win32con
     import win32api
+    import win32process
 except ImportError as e:
     print(f"[ERROR] Missing: {e}")
     print("  pip install pyautogui opencv-python pillow pywin32")
     sys.exit(1)
+
+import ctypes
+
+# ─────────────────────────────────────────────
+#  SendInput - true OS-level click (Toram ignores PostMessage clicks)
+# ─────────────────────────────────────────────
+
+PUL = ctypes.POINTER(ctypes.c_ulong)
+
+class MouseInput(ctypes.Structure):
+    _fields_ = [("dx", ctypes.c_long),
+                ("dy", ctypes.c_long),
+                ("mouseData", ctypes.c_ulong),
+                ("dwFlags", ctypes.c_ulong),
+                ("time", ctypes.c_ulong),
+                ("dwExtraInfo", PUL)]
+
+class Input_I(ctypes.Union):
+    _fields_ = [("mi", MouseInput)]
+
+class Input(ctypes.Structure):
+    _fields_ = [("type", ctypes.c_ulong), ("ii", Input_I)]
+
+MOUSEEVENTF_MOVE     = 0x0001
+MOUSEEVENTF_LEFTDOWN  = 0x0002
+MOUSEEVENTF_LEFTUP    = 0x0004
+MOUSEEVENTF_RIGHTDOWN = 0x0008
+MOUSEEVENTF_RIGHTUP   = 0x0010
+MOUSEEVENTF_ABSOLUTE = 0x8000
+INPUT_MOUSE          = 0
+
+def sendinput_click(screen_x, screen_y, restore_cursor=True):
+    """
+    True OS-level click. Saves your real cursor position first,
+    clicks at (screen_x, screen_y), then restores cursor back
+    to where it was — so your mouse on the manga/video side
+    is never "stolen" for more than a fraction of a second.
+    """
+    # Save current real cursor position
+    orig_pos = win32api.GetCursorPos() if restore_cursor else None
+
+    screen_w = ctypes.windll.user32.GetSystemMetrics(0)
+    screen_h = ctypes.windll.user32.GetSystemMetrics(1)
+    abs_x = int(screen_x * 65535 / screen_w)
+    abs_y = int(screen_y * 65535 / screen_h)
+    extra = ctypes.c_ulong(0)
+
+    def send(flag, ax=abs_x, ay=abs_y):
+        ii_ = Input_I()
+        ii_.mi = MouseInput(ax, ay, 0, flag | MOUSEEVENTF_ABSOLUTE, 0, ctypes.pointer(extra))
+        x = Input(INPUT_MOUSE, ii_)
+        ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
+
+    send(MOUSEEVENTF_MOVE)
+    time.sleep(0.05)
+    send(MOUSEEVENTF_LEFTDOWN)
+    time.sleep(0.08)
+    send(MOUSEEVENTF_LEFTUP)
+
+    # Restore cursor back to where the user had it
+    if restore_cursor and orig_pos:
+        time.sleep(0.05)
+        ow, oh = orig_pos
+        oabs_x = int(ow * 65535 / screen_w)
+        oabs_y = int(oh * 65535 / screen_h)
+        send(MOUSEEVENTF_MOVE, oabs_x, oabs_y)
+
+# ─────────────────────────────────────────────
+#  SendInput - true OS-level key press (for skill keys / movement)
+# ─────────────────────────────────────────────
+
+class KeyBdInput(ctypes.Structure):
+    _fields_ = [("wVk", ctypes.c_ushort),
+                ("wScan", ctypes.c_ushort),
+                ("dwFlags", ctypes.c_ulong),
+                ("time", ctypes.c_ulong),
+                ("dwExtraInfo", PUL)]
+
+class Input_K(ctypes.Union):
+    _fields_ = [("ki", KeyBdInput)]
+
+class InputK(ctypes.Structure):
+    _fields_ = [("type", ctypes.c_ulong), ("ii", Input_K)]
+
+INPUT_KEYBOARD  = 1
+KEYEVENTF_KEYUP = 0x0002
+
+VK_MAP = {
+    'w': 0x57, 'a': 0x41, 's': 0x53, 'd': 0x44, 'f': 0x46,
+    '0':0x30,'1':0x31,'2':0x32,'3':0x33,'4':0x34,
+    '5':0x35,'6':0x36,'7':0x37,'8':0x38,'9':0x39,
+}
+
+def sendinput_key_down(key):
+    vk = VK_MAP.get(key.lower())
+    if vk is None:
+        return
+    extra = ctypes.c_ulong(0)
+    ii_ = Input_K()
+    ii_.ki = KeyBdInput(vk, 0, 0, 0, ctypes.pointer(extra))
+    x = InputK(INPUT_KEYBOARD, ii_)
+    ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
+
+def sendinput_key_up(key):
+    vk = VK_MAP.get(key.lower())
+    if vk is None:
+        return
+    extra = ctypes.c_ulong(0)
+    ii_ = Input_K()
+    ii_.ki = KeyBdInput(vk, 0, KEYEVENTF_KEYUP, 0, ctypes.pointer(extra))
+    x = InputK(INPUT_KEYBOARD, ii_)
+    ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
+
+def sendinput_key_press(key, hold_sec=0):
+    """True OS-level key press. Needed because Toram ignores PostMessage keys."""
+    sendinput_key_down(key)
+    if hold_sec > 0:
+        time.sleep(hold_sec)
+    else:
+        time.sleep(random.uniform(0.06, 0.12))
+    sendinput_key_up(key)
 
 # ─────────────────────────────────────────────
 #  CONFIG
@@ -37,18 +159,19 @@ IMG_COLLAB_TITLE    = "img_collab_title.png"   # Collab Battle Lv90
 IMG_READY           = "img_ready.png"
 IMG_OK_BLUE         = "img_ok_orange.png"   # same file - only orange needed
 IMG_OK_ORANGE       = "img_ok_orange.png"
+IMG_SKILL_ICON      = "img_skill_icon.png"  # skill icon in slot 6 (clicked, not keyed)
 
 MATCH_CONFIDENCE    = 0.55
 
-SKILL_KEY           = "6"
+SKILL_KEY           = "6"   # kept as fallback only
 
 DELAY_SHORT         = (0.3, 0.7)
 DELAY_MEDIUM        = (0.8, 1.4)
 DELAY_LONG          = (1.5, 2.5)
 
-WAIT_BLACKSCREEN    = 2.5
-WAIT_BOSS_INTRO     = 6.5
-WAIT_BETWEEN_SKILL  = 5.0
+WAIT_BLACKSCREEN    = 3.0
+WAIT_BOSS_INTRO     = 9.0
+WAIT_BETWEEN_SKILL  = 9.0
 WAIT_VICTORY        = 3.5
 WALK_UP_DURATION    = 2.0
 STARTUP_DELAY       = 5        # seconds after F8 to switch to game
@@ -134,31 +257,104 @@ def get_window_rect(hwnd):
     pt   = win32gui.ClientToScreen(hwnd, (rect[0], rect[1]))
     return (pt[0], pt[1], pt[0] + rect[2], pt[1] + rect[3])
 
-def focus_game_window(hwnd):
+def force_foreground(hwnd):
     """
-    Bring game window to front and click its CENTER to ensure
-    it gets input focus (not a Chrome tab or other window).
+    Reliably bring hwnd to foreground even when called from a
+    background process (VS Code terminal). Uses the AttachThreadInput
+    trick which Windows requires for background apps to steal focus.
     """
     try:
-        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-        win32gui.SetForegroundWindow(hwnd)
-        time.sleep(0.3)
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 
-        # Click the center of the game window
-        l, t, r, b = get_window_rect(hwnd)
-        cx = (l + r) // 2
-        cy = (t + b) // 2
-        pyautogui.moveTo(cx, cy, duration=0.15)
-        pyautogui.click()
-        time.sleep(0.25)
-        log(f"  [FOCUS] Clicked game center ({cx}, {cy})")
+        fg_hwnd = win32gui.GetForegroundWindow()
+        fg_thread = win32api.GetCurrentThreadId()
+        target_thread, _ = win32process.GetWindowThreadProcessId(hwnd)
+        cur_thread = win32api.GetCurrentThreadId()
+
+        if target_thread != cur_thread:
+            ctypes.windll.user32.AttachThreadInput(cur_thread, target_thread, True)
+            win32gui.SetForegroundWindow(hwnd)
+            win32gui.BringWindowToTop(hwnd)
+            ctypes.windll.user32.AttachThreadInput(cur_thread, target_thread, False)
+        else:
+            win32gui.SetForegroundWindow(hwnd)
+
+        return True
     except Exception as e:
-        log(f"  [WARN] Focus error: {e}")
+        log(f"  [WARN] force_foreground failed: {e}")
+        # Fallback: simple alt-key trick to unlock SetForegroundWindow restriction
+        try:
+            ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)  # ALT down
+            win32gui.SetForegroundWindow(hwnd)
+            ctypes.windll.user32.keybd_event(0x12, 0, 2, 0)  # ALT up
+            return True
+        except Exception as e2:
+            log(f"  [WARN] Fallback foreground also failed: {e2}")
+            return False
+
+
+def focus_game_window(hwnd, click_center=False):
+    """
+    Bring game window to true foreground (no manual click needed).
+    click_center=True → also clicks center (rarely needed now)
+    """
+    ok = force_foreground(hwnd)
+    time.sleep(0.2)
+    if click_center:
+        l, t, r, b = get_window_rect(hwnd)
+        cx, cy = (l + r) // 2, (t + b) // 2
+        sendinput_click(cx, cy)
+        time.sleep(0.2)
+        log(f"  [FOCUS] Clicked game center ({cx}, {cy})")
+    else:
+        log(f"  [FOCUS] Game forced to foreground (no click) — ok={ok}")
 
 def capture_window(hwnd):
-    l, t, r, b = get_window_rect(hwnd)
-    img = ImageGrab.grab(bbox=(l, t, r, b))
-    return np.array(img), (l, t)
+    """
+    Capture game window using PrintWindow API.
+    Works even when the window is covered, minimized, or behind other windows.
+    """
+    try:
+        import ctypes
+        from ctypes import windll
+        import win32ui
+
+        l, t, r, b = get_window_rect(hwnd)
+        w = r - l
+        h = b - t
+
+        # Create device context and bitmap
+        hwnd_dc     = win32gui.GetWindowDC(hwnd)
+        mfc_dc      = win32ui.CreateDCFromHandle(hwnd_dc)
+        save_dc     = mfc_dc.CreateCompatibleDC()
+        save_bitmap = win32ui.CreateBitmap()
+        save_bitmap.CreateCompatibleBitmap(mfc_dc, w, h)
+        save_dc.SelectObject(save_bitmap)
+
+        # PrintWindow captures window content regardless of visibility
+        result = windll.user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), 3)
+
+        bmp_info = save_bitmap.GetInfo()
+        bmp_str  = save_bitmap.GetBitmapBits(True)
+        img = np.frombuffer(bmp_str, dtype=np.uint8).reshape(h, w, 4)
+        img = img[:, :, :3]  # drop alpha, keep RGB (actually BGR from win32)
+        img = img[:, :, ::-1].copy()  # convert BGR to RGB
+
+        # Cleanup
+        win32gui.DeleteObject(save_bitmap.GetHandle())
+        save_dc.DeleteDC()
+        mfc_dc.DeleteDC()
+        win32gui.ReleaseDC(hwnd, hwnd_dc)
+
+        return img, (l, t)
+
+    except Exception as e:
+        # Fallback to ImageGrab if PrintWindow fails
+        log(f"  [WARN] PrintWindow failed ({e}), falling back to ImageGrab")
+        l, t, r, b = get_window_rect(hwnd)
+        img = ImageGrab.grab(bbox=(l, t, r, b))
+        return np.array(img), (l, t)
 
 # ── Template matching ───────────────────────
 
@@ -183,14 +379,17 @@ def find_template(screenshot_np, template_path, confidence=MATCH_CONFIDENCE):
     return None
 
 def real_click(sx, sy, double=False):
-    pyautogui.moveTo(sx + random.randint(-3,3),
-                     sy + random.randint(-3,3),
-                     duration=random.uniform(0.10, 0.22))
-    human_delay((0.05, 0.10))
-    pyautogui.click()
+    """
+    True OS-level click at absolute screen coords (sx, sy).
+    Toram ignores SendMessage/PostMessage clicks, so we use SendInput
+    which briefly moves the real cursor and sends a genuine click.
+    """
+    jx = random.randint(-2, 2)
+    jy = random.randint(-2, 2)
+    sendinput_click(sx + jx, sy + jy)
     if double:
         human_delay((0.08, 0.15))
-        pyautogui.click()
+        sendinput_click(sx + jx, sy + jy)
 
 def click_template(hwnd, template_path, label="", double=False, debug=False):
     ss, (wl, wt) = capture_window(hwnd)
@@ -233,49 +432,56 @@ def send_key_to_window(hwnd, key, hold_sec=0):
 def step_walk_to_npc(hwnd):
     """
     Hold W and scan every 0.3s for the Collab tooltip.
-    Stop walking the moment it appears, then click it.
+    Stop walking, wait for character to settle, then click the
+    tooltip text directly (F key not reliable enough - back to click).
+    Cursor auto-restores after click.
     Max walk time = 4 seconds before giving up.
     Returns True if tooltip was found and clicked.
     """
     log("Step 1+2 – Walking toward NPC, watching for Collab Battle Lv140 tooltip...")
-    VK_W = win32api.VkKeyScan("w") & 0xFF
+    force_foreground(hwnd)
+    time.sleep(0.2)
     MAX_WALK = 4.0
     CHECK_INTERVAL = 0.3
 
-    # Focus game window before sending keys
-    focus_game_window(hwnd)
-    time.sleep(0.2)
-
-    pyautogui.keyDown("w")
+    VK_W = win32api.VkKeyScan("w") & 0xFF
+    VK_S = win32api.VkKeyScan("s") & 0xFF
     start = time.time()
     found = False
+
+    # Hold W - send directly to game window (no focus needed)
+    win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_W, 0)
 
     while time.time() - start < MAX_WALK:
         time.sleep(CHECK_INTERVAL)
         ss, (wl, wt) = capture_window(hwnd)
         pos = find_template(ss, IMG_COLLAB_TITLE)
         if pos:
-            # Stop W immediately
-            pyautogui.keyUp("w")
-            # Tap S to kill momentum (pyautogui works since game is focused)
-            pyautogui.keyDown("s")
+            # Release W
+            win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_W, 0)
+            # Tap S to stop momentum
+            win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_S, 0)
             time.sleep(0.20)
-            pyautogui.keyUp("s")
-            time.sleep(0.25)
-            # Re-check position after stopping
+            win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_S, 0)
+
+            # Let character fully settle before clicking
+            time.sleep(0.5)
+
+            # Re-check tooltip position after settling (text may have shifted)
             ss2, (wl2, wt2) = capture_window(hwnd)
             pos2 = find_template(ss2, IMG_COLLAB_TITLE)
             if pos2:
                 sx, sy = wl2 + pos2[0], wt2 + pos2[1]
             else:
                 sx, sy = wl + pos[0], wt + pos[1]
-            log(f"  Tooltip found after {time.time()-start:.1f}s -> clicking ({sx},{sy})")
+
+            log(f"  Tooltip confirmed after {time.time()-start:.1f}s -> clicking ({sx},{sy})")
             real_click(sx, sy)
             found = True
             break
 
     if not found:
-        pyautogui.keyUp("w")   # always release W even if not found
+        win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_W, 0)
         log("  [WARN] Tooltip not found within 4s of walking.")
 
     human_delay(DELAY_MEDIUM)
@@ -309,7 +515,6 @@ def step_click_collab(hwnd):
 
 def step_click_ready(hwnd):
     log("Step 3 – Clicking 'I'm ready!!'…")
-    focus_game_window(hwnd)
     for i in range(8):
         if click_template(hwnd, IMG_READY,
                           label="I'm ready!!", debug=(i < 2)):
@@ -326,13 +531,30 @@ def step_wait_for_battle():
     time.sleep(total)
 
 def step_use_skill(hwnd):
-    log("Step 5 – Using skill (key 6 directly to game)...")
-    send_key_to_window(hwnd, SKILL_KEY)
-    human_delay((0.15, 0.30))
-    send_key_to_window(hwnd, SKILL_KEY)
+    """
+    Use skill by double-clicking the skill icon (slot 6).
+    Keyboard '6' doesn't work for this action in Toram - needs a real click.
+    Cursor auto-restores after click.
+    """
+    log("Step 5 – Using skill (double-click on skill icon)...")
+    ss, (wl, wt) = capture_window(hwnd)
+    pos = find_template(ss, IMG_SKILL_ICON)
+    if pos:
+        sx, sy = wl + pos[0], wt + pos[1]
+        log(f"  ✓ Skill icon found -> double-clicking ({sx},{sy})")
+        real_click(sx, sy, double=True)
+    else:
+        log("  [WARN] Skill icon not found. Falling back to keyboard '6'...")
+        force_foreground(hwnd)
+        time.sleep(0.15)
+        sendinput_key_press(SKILL_KEY)
+        human_delay((0.20, 0.40))
+        sendinput_key_press(SKILL_KEY)
+    human_delay((0.10, 0.20))
+
 def step_finish_boss(hwnd):
     log("Step 6 – Monitoring boss fight…")
-    for round_ in range(1, 8):
+    for round_ in range(1, 2):
         wait = WAIT_BETWEEN_SKILL + random.uniform(-0.5, 1.2)
         log(f"  Waiting {wait:.1f}s…")
         time.sleep(wait)
