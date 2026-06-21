@@ -48,7 +48,7 @@ The bot uses **image recognition** (`opencv`) to find UI elements. You need to s
 | `img_ready.png` | The "I'm ready!!" button |
 | `img_ok_blue.png` | Blue OK button (victory screen) |
 | `img_ok_orange.png` | Orange OK button (hover/fallback) |
-| `img_sword.png` | Sword/skill icon *(optional)* |
+| `img_skill_icon.png` | Sword/skill icon *(optional)* |
 
 > **Tip:** Use Windows Snipping Tool or `capture_templates.py` to capture these images accurately.
 
