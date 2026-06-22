@@ -157,8 +157,7 @@ GAME_WINDOW_KEYWORDS = ["toram", "ToramOnline"]
 
 IMG_COLLAB_TITLE    = "img_collab_title.png"   # Collab Battle Lv140
 IMG_READY           = "img_ready.png"
-IMG_OK_BLUE         = "img_ok_orange.png"   # same file - only orange needed
-IMG_OK_ORANGE       = "img_ok_orange.png"
+IMG_OK              = "img_ok_orange.png"
 IMG_SKILL_ICON      = "img_skill_icon.png"  # skill icon in slot 6 (clicked, not keyed)
 
 MATCH_CONFIDENCE    = 0.55
@@ -554,26 +553,28 @@ def step_use_skill(hwnd):
 
 def step_finish_boss(hwnd):
     log("Step 6 – Monitoring boss fight…")
-    for round_ in range(1, 2):
-        wait = WAIT_BETWEEN_SKILL + random.uniform(-0.5, 1.2)
-        log(f"  Waiting {wait:.1f}s…")
-        time.sleep(wait)
-        ss, _ = capture_window(hwnd)
-        if find_template(ss, IMG_OK_BLUE) or find_template(ss, IMG_OK_ORANGE):
-            log("  ✓ Victory screen!")
-            return
-        log(f"  Round {round_} – using skill again…")
+    for round_ in range(1, 6):
+        time.sleep(WAIT_BETWEEN_SKILL + random.uniform(-0.5, 1.0))
+        ss, (wl, wt) = capture_window(hwnd)
+        pos = find_template(ss, IMG_OK, confidence=0.35)  # ✅
+        if pos:
+            log(f"  Victory! Found OK → clicking immediately")
+            sx, sy = wl + pos[0], wt + pos[1]
+            real_click(sx, sy)
+            human_delay(DELAY_MEDIUM)
+            return True
+        log(f"  Round {round_} – Boss still alive, using skill…")
         step_use_skill(hwnd)
     time.sleep(WAIT_BETWEEN_SKILL)
+    return False
 
 def step_click_ok(hwnd):
     log("Step 7 – Clicking OK…")
     focus_game_window(hwnd)
     for i in range(10):
-        for img, lbl in [(IMG_OK_BLUE,"OK blue"),(IMG_OK_ORANGE,"OK orange")]:
-            if click_template(hwnd, img, label=lbl, debug=(i < 2)):
-                human_delay(DELAY_MEDIUM)
-                return True
+        if click_template(hwnd, IMG_OK, label="OK", debug=(i < 2)):  # ✅
+            human_delay(DELAY_MEDIUM)
+            return True
         log(f"  Attempt {i+1}/10 – waiting…")
         human_delay(DELAY_LONG)
     log("  [WARN] OK not found.")
@@ -615,8 +616,8 @@ def bot_loop():
                 continue
             step_wait_for_battle()
             step_use_skill(hwnd)
-            step_finish_boss(hwnd)
-            step_click_ok(hwnd)
+            if not step_finish_boss(hwnd):
+                step_click_ok(hwnd) 
             step_wait_return()
 
         except pyautogui.FailSafeException:
@@ -671,8 +672,8 @@ if __name__ == "__main__":
     print(f"  Debug    : {DEBUG_FOLDER}/")
     print("=" * 55 + "\n")
 
-    missing = [t for t in [IMG_COLLAB_TITLE, IMG_READY, IMG_OK_BLUE, IMG_OK_ORANGE]
-               if not os.path.exists(t)]
+    missing = [t for t in [IMG_COLLAB_TITLE, IMG_READY, IMG_OK, IMG_SKILL_ICON]
+           if not os.path.exists(t)]
     if missing:
         print("[WARN] Missing templates — run capture_templates.py first:")
         for m in missing:
