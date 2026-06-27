@@ -160,7 +160,7 @@ IMG_READY           = "img_ready.png"
 IMG_OK              = "img_ok_orange.png"
 IMG_SKILL_ICON      = "img_skill_icon.png"  # skill icon in slot 6 (clicked, not keyed)
 
-MATCH_CONFIDENCE    = 0.55
+MATCH_CONFIDENCE    = 0.65
 
 SKILL_KEY           = "6"   # kept as fallback only
 
@@ -171,7 +171,7 @@ DELAY_LONG          = (1.5, 2.5)
 WAIT_BLACKSCREEN    = 3.0
 WAIT_BOSS_INTRO     = 9.0
 WAIT_BETWEEN_SKILL  = 9.0
-WAIT_VICTORY        = 3.5
+WAIT_VICTORY        = 7
 WALK_UP_DURATION    = 2.0
 STARTUP_DELAY       = 5        # seconds after F8 to switch to game
 
@@ -428,60 +428,145 @@ def send_key_to_window(hwnd, key, hold_sec=0):
 #  BOT STEPS
 # ─────────────────────────────────────────────
 
-def step_walk_to_npc(hwnd):
-    """
-    Hold W and scan every 0.3s for the Collab tooltip.
-    Stop walking, wait for character to settle, then click the
-    tooltip text directly (F key not reliable enough - back to click).
-    Cursor auto-restores after click.
-    Max walk time = 4 seconds before giving up.
-    Returns True if tooltip was found and clicked.
-    """
-    log("Step 1+2 – Walking toward NPC, watching for Collab Battle Lv140 tooltip...")
-    force_foreground(hwnd)
-    time.sleep(0.2)
-    MAX_WALK = 4.0
-    CHECK_INTERVAL = 0.3
+# def step_walk_to_npc(hwnd):
+#     """
+#     Hold W and scan every 0.3s for the Collab tooltip.
+#     Stop walking, wait for character to settle, then click the
+#     tooltip text directly (F key not reliable enough - back to click).
+#     Cursor auto-restores after click.
+#     Max walk time = 4 seconds before giving up.
+#     Returns True if tooltip was found and clicked.
+#     """
+#     log("Step 1+2 – Walking toward NPC, watching for Collab Battle Lv140 tooltip...")
+#     force_foreground(hwnd)
+#     time.sleep(0.2)
+#     MAX_WALK = 4.0
+#     CHECK_INTERVAL = 0.3
 
-    VK_W = win32api.VkKeyScan("w") & 0xFF
-    VK_S = win32api.VkKeyScan("s") & 0xFF
+#     VK_W = win32api.VkKeyScan("w") & 0xFF
+#     VK_S = win32api.VkKeyScan("s") & 0xFF
+#     start = time.time()
+#     found = False
+
+#     # Hold W - send directly to game window (no focus needed)
+#     win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_W, 0)
+
+#     while time.time() - start < MAX_WALK:
+#         time.sleep(CHECK_INTERVAL)
+#         ss, (wl, wt) = capture_window(hwnd)
+#         pos = find_template(ss, IMG_COLLAB_TITLE)
+#         if pos:
+#             # Release W
+#             win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_W, 0)
+#             # Tap S to stop momentum
+#             win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_S, 0)
+#             time.sleep(0.20)
+#             win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_S, 0)
+
+#             # Let character fully settle before clicking
+#             time.sleep(0.5)
+
+#             # Re-check tooltip position after settling (text may have shifted)
+#             ss2, (wl2, wt2) = capture_window(hwnd)
+#             pos2 = find_template(ss2, IMG_COLLAB_TITLE)
+#             if pos2:
+#                 sx, sy = wl2 + pos2[0], wt2 + pos2[1]
+#             else:
+#                 sx, sy = wl + pos[0], wt + pos[1]
+
+#             log(f"  Tooltip confirmed after {time.time()-start:.1f}s -> clicking ({sx},{sy})")
+#             real_click(sx, sy)
+#             found = True
+#             break
+
+#     if not found:
+#         win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_W, 0)
+#         log("  [WARN] Tooltip not found within 4s of walking.")
+
+#     human_delay(DELAY_MEDIUM)
+#     return found
+
+# def step_walk_to_npc(hwnd):
+#     log("Step 1+2 – Walking toward NPC, watching for Collab Battle Lv140 tooltip...")
+
+#     force_foreground(hwnd)
+#     time.sleep(0.4)
+#     log(f"  [FOCUS] Foreground: {win32gui.GetWindowText(win32gui.GetForegroundWindow())}")
+    
+#     MAX_WALK = 6.0
+#     CHECK_INTERVAL = 0.3
+
+#     VK_W = win32api.VkKeyScan("w") & 0xFF
+#     VK_S = win32api.VkKeyScan("s") & 0xFF
+#     start = time.time()
+#     found = False
+
+#     win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_W, 0)
+
+#     while time.time() - start < MAX_WALK:
+#         time.sleep(CHECK_INTERVAL)
+#         ss, (wl, wt) = capture_window(hwnd)
+#         pos = find_template(ss, IMG_COLLAB_TITLE)
+#         if pos:
+#             win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_W, 0)
+#             win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_S, 0)
+#             time.sleep(0.20)
+#             win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_S, 0)
+#             time.sleep(0.5)
+
+#             ss2, (wl2, wt2) = capture_window(hwnd)
+#             pos2 = find_template(ss2, IMG_COLLAB_TITLE)
+#             sx, sy = (wl2 + pos2[0], wt2 + pos2[1]) if pos2 else (wl + pos[0], wt + pos[1])
+
+#             log(f"  Tooltip confirmed after {time.time()-start:.1f}s -> clicking ({sx},{sy})")
+#             real_click(sx, sy)
+#             found = True
+#             break
+
+#     if not found:
+#         win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_W, 0)
+#         log("  [WARN] Tooltip not found within 6s of walking.")
+
+#     human_delay(DELAY_MEDIUM)
+#     return found
+
+def step_walk_to_npc(hwnd):
+    log("Step 1+2 – Walking toward NPC, watching for Collab Battle Lv140 tooltip...")
+
+    force_foreground(hwnd)
+    time.sleep(0.5)
+    log(f"  [FOCUS] Foreground: {win32gui.GetWindowText(win32gui.GetForegroundWindow())}")
+
+    MAX_WALK = 6.0
+    CHECK_INTERVAL = 0.3
     start = time.time()
     found = False
 
-    # Hold W - send directly to game window (no focus needed)
-    win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_W, 0)
+    pyautogui.keyDown('w')   # ← swap to pyautogui
+    try:
+        while time.time() - start < MAX_WALK:
+            time.sleep(CHECK_INTERVAL)
+            ss, (wl, wt) = capture_window(hwnd)
+            pos = find_template(ss, IMG_COLLAB_TITLE)
+            if pos:
+                pyautogui.keyUp('w')
+                pyautogui.keyDown('s')
+                time.sleep(0.20)
+                pyautogui.keyUp('s')
+                time.sleep(0.5)
 
-    while time.time() - start < MAX_WALK:
-        time.sleep(CHECK_INTERVAL)
-        ss, (wl, wt) = capture_window(hwnd)
-        pos = find_template(ss, IMG_COLLAB_TITLE)
-        if pos:
-            # Release W
-            win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_W, 0)
-            # Tap S to stop momentum
-            win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_S, 0)
-            time.sleep(0.20)
-            win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_S, 0)
-
-            # Let character fully settle before clicking
-            time.sleep(0.5)
-
-            # Re-check tooltip position after settling (text may have shifted)
-            ss2, (wl2, wt2) = capture_window(hwnd)
-            pos2 = find_template(ss2, IMG_COLLAB_TITLE)
-            if pos2:
-                sx, sy = wl2 + pos2[0], wt2 + pos2[1]
-            else:
-                sx, sy = wl + pos[0], wt + pos[1]
-
-            log(f"  Tooltip confirmed after {time.time()-start:.1f}s -> clicking ({sx},{sy})")
-            real_click(sx, sy)
-            found = True
-            break
+                ss2, (wl2, wt2) = capture_window(hwnd)
+                pos2 = find_template(ss2, IMG_COLLAB_TITLE)
+                sx, sy = (wl2 + pos2[0], wt2 + pos2[1]) if pos2 else (wl + pos[0], wt + pos[1])
+                log(f"  Tooltip confirmed after {time.time()-start:.1f}s -> clicking ({sx},{sy})")
+                real_click(sx, sy)
+                found = True
+                break
+    finally:
+        pyautogui.keyUp('w')   # always release
 
     if not found:
-        win32api.PostMessage(hwnd, win32con.WM_KEYUP, VK_W, 0)
-        log("  [WARN] Tooltip not found within 4s of walking.")
+        log("  [WARN] Tooltip not found within 6s of walking.")
 
     human_delay(DELAY_MEDIUM)
     return found
@@ -556,15 +641,27 @@ def step_finish_boss(hwnd):
     for round_ in range(1, 6):
         time.sleep(WAIT_BETWEEN_SKILL + random.uniform(-0.5, 1.0))
         ss, (wl, wt) = capture_window(hwnd)
-        pos = find_template(ss, IMG_OK, confidence=0.35)  # ✅
+
+        # Raise threshold — 0.35 is way too low, causes false positives
+        pos = find_template(ss, IMG_OK, confidence=0.65)
         if pos:
-            log(f"  Victory! Found OK → clicking immediately")
-            sx, sy = wl + pos[0], wt + pos[1]
-            real_click(sx, sy)
-            human_delay(DELAY_MEDIUM)
-            return True
+            log(f"  Victory screen detected! Waiting 1s for it to fully render...")
+            time.sleep(1.0)  # let the victory screen fully animate in
+            # Re-confirm the OK button is still there
+            ss2, (wl2, wt2) = capture_window(hwnd)
+            pos2 = find_template(ss2, IMG_OK, confidence=0.65)
+            if pos2:
+                sx, sy = wl2 + pos2[0], wt2 + pos2[1]
+                log(f"  ✓ OK confirmed → clicking ({sx}, {sy})")
+                real_click(sx, sy)
+                human_delay(DELAY_MEDIUM)
+                return True
+            else:
+                log(f"  False positive — OK not confirmed on re-check, continuing...")
+
         log(f"  Round {round_} – Boss still alive, using skill…")
         step_use_skill(hwnd)
+
     time.sleep(WAIT_BETWEEN_SKILL)
     return False
 
@@ -572,7 +669,7 @@ def step_click_ok(hwnd):
     log("Step 7 – Clicking OK…")
     focus_game_window(hwnd)
     for i in range(10):
-        if click_template(hwnd, IMG_OK, label="OK", debug=(i < 2)):  # ✅
+        if click_template(hwnd, IMG_OK, label="OK", debug=(i < 2)):  # uses default 0.55
             human_delay(DELAY_MEDIUM)
             return True
         log(f"  Attempt {i+1}/10 – waiting…")
@@ -584,6 +681,19 @@ def step_wait_return():
     wait = WAIT_VICTORY + random.uniform(0, 1.5)
     log(f"Step 8 – Waiting {wait:.1f}s for map reload…")
     time.sleep(wait)
+
+def step_wake_input(hwnd):
+    """
+    Tap W briefly to wake up Toram's input handler after map transition.
+    0.05s is too short to visibly move the character.
+    """
+    force_foreground(hwnd)
+    time.sleep(0.3)
+    pyautogui.keyDown('w')
+    time.sleep(0.05)
+    pyautogui.keyUp('w')
+    time.sleep(0.2)
+    log("  [WAKE] Input handler activated.")
 
 # ─────────────────────────────────────────────
 #  MAIN LOOP
@@ -619,6 +729,7 @@ def bot_loop():
             if not step_finish_boss(hwnd):
                 step_click_ok(hwnd) 
             step_wait_return()
+            step_wake_input(hwnd)
 
         except pyautogui.FailSafeException:
             log("[FAILSAFE] Corner triggered — stopped!")
