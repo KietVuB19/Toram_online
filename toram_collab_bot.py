@@ -80,14 +80,14 @@ def sendinput_click(screen_x, screen_y, restore_cursor=True):
         ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
 
     send(MOUSEEVENTF_MOVE)
-    time.sleep(0.05)
+    time.sleep(random.uniform(0.03, 0.07))
     send(MOUSEEVENTF_LEFTDOWN)
-    time.sleep(0.08)
+    time.sleep(random.uniform(0.06, 0.13))
     send(MOUSEEVENTF_LEFTUP)
 
     # Restore cursor back to where the user had it
     if restore_cursor and orig_pos:
-        time.sleep(0.05)
+        time.sleep(random.uniform(0.03, 0.07))
         ow, oh = orig_pos
         oabs_x = int(ow * 65535 / screen_w)
         oabs_y = int(oh * 65535 / screen_h)
@@ -168,8 +168,8 @@ DELAY_SHORT         = (0.3, 0.7)
 DELAY_MEDIUM        = (0.8, 1.4)
 DELAY_LONG          = (1.5, 2.5)
 
-WAIT_BLACKSCREEN    = 3.0
-WAIT_BOSS_INTRO     = 9.0
+WAIT_BLACKSCREEN = (2.5, 3.5)
+WAIT_BOSS_INTRO  = (8.0, 10.5)
 WAIT_BETWEEN_SKILL  = 9.0
 WAIT_VICTORY        = 7
 WALK_UP_DURATION    = 2.0
@@ -383,11 +383,11 @@ def real_click(sx, sy, double=False):
     Toram ignores SendMessage/PostMessage clicks, so we use SendInput
     which briefly moves the real cursor and sends a genuine click.
     """
-    jx = random.randint(-2, 2)
-    jy = random.randint(-2, 2)
+    jx = random.randint(-5, 5)
+    jy = random.randint(-4, 4)
     sendinput_click(sx + jx, sy + jy)
     if double:
-        human_delay((0.08, 0.15))
+        human_delay((0.08, 0.22))
         sendinput_click(sx + jx, sy + jy)
 
 def click_template(hwnd, template_path, label="", double=False, debug=False):
@@ -605,12 +605,13 @@ def step_click_ready(hwnd):
             human_delay(DELAY_SHORT)
             return True
         log(f"  Attempt {i+1}/8 – retrying…")
-        human_delay(DELAY_MEDIUM)
+        human_delay(random.choice([DELAY_SHORT, DELAY_MEDIUM, DELAY_LONG]))
     log("  [WARN] Ready button not found.")
     return False
 
 def step_wait_for_battle():
-    total = WAIT_BLACKSCREEN + WAIT_BOSS_INTRO + random.uniform(0, 1.5)
+    # total = WAIT_BLACKSCREEN + WAIT_BOSS_INTRO + random.uniform(0, 1.5)
+    total = random.uniform(*WAIT_BLACKSCREEN) + random.uniform(*WAIT_BOSS_INTRO)
     log(f"Step 4 – Waiting {total:.1f}s for intro…")
     time.sleep(total)
 
@@ -639,7 +640,7 @@ def step_use_skill(hwnd):
 def step_finish_boss(hwnd):
     log("Step 6 – Monitoring boss fight…")
     for round_ in range(1, 6):
-        time.sleep(WAIT_BETWEEN_SKILL + random.uniform(-0.5, 1.0))
+        time.sleep(WAIT_BETWEEN_SKILL + random.uniform(-1.0, 3.0))
         ss, (wl, wt) = capture_window(hwnd)
 
         # Raise threshold — 0.35 is way too low, causes false positives
@@ -681,6 +682,7 @@ def step_wait_return():
     wait = WAIT_VICTORY + random.uniform(0, 1.5)
     log(f"Step 8 – Waiting {wait:.1f}s for map reload…")
     time.sleep(wait)
+    time.sleep(random.uniform(0.5, 2.5))
 
 def step_wake_input(hwnd):
     """
@@ -690,7 +692,7 @@ def step_wake_input(hwnd):
     force_foreground(hwnd)
     time.sleep(0.3)
     pyautogui.keyDown('w')
-    time.sleep(0.05)
+    time.sleep(random.uniform(0.04, 0.09))
     pyautogui.keyUp('w')
     time.sleep(0.2)
     log("  [WAKE] Input handler activated.")
@@ -730,7 +732,7 @@ def bot_loop():
                 step_click_ok(hwnd) 
             step_wait_return()
             step_wake_input(hwnd)
-
+            time.sleep(random.uniform(0.3, 1.2))
         except pyautogui.FailSafeException:
             log("[FAILSAFE] Corner triggered — stopped!")
             running = False
