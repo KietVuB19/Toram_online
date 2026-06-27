@@ -197,11 +197,11 @@ def human_delay(r):
 def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}")
 
-def save_debug(name, img_np):
-    os.makedirs(DEBUG_FOLDER, exist_ok=True)
-    path = os.path.join(DEBUG_FOLDER, f"{name}_{int(time.time())}.png")
-    cv2.imwrite(path, cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR))
-    log(f"  [DEBUG] Saved: {path}")
+# def save_debug(name, img_np):
+#     os.makedirs(DEBUG_FOLDER, exist_ok=True)
+#     path = os.path.join(DEBUG_FOLDER, f"{name}_{int(time.time())}.png")
+#     cv2.imwrite(path, cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR))
+#     log(f"  [DEBUG] Saved: {path}")
 
 # ── Window detection ────────────────────────
 
@@ -392,8 +392,8 @@ def real_click(sx, sy, double=False):
 
 def click_template(hwnd, template_path, label="", double=False, debug=False):
     ss, (wl, wt) = capture_window(hwnd)
-    if debug:
-        save_debug(label.replace(" ","_"), ss)
+    # if debug:
+    #     save_debug(label.replace(" ","_"), ss)
     pos = find_template(ss, template_path)
     if pos:
         sx, sy = wl + pos[0], wt + pos[1]
